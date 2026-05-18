@@ -1,16 +1,23 @@
 pipeline {
-    agent {
-        docker {
-            image 'abhishekf5/maven-abhishek-docker-agent:v1'
-            args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
-        }
+
+    agent any
+
+    tools {
+        jdk 'jdk21'
+        maven 'maven3'
+    }
+
+    environment {
+        SONAR_URL = "http://13.127.187.57:9000"
+        DOCKER_IMAGE = "harshitha30galla/ultimate-cicd:${BUILD_NUMBER}"
+        GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
+        GIT_USER_NAME = "Harshitha-Galla5"
     }
 
     stages {
 
         stage('Checkout') {
             steps {
-                sh 'echo "Checkout Stage Passed"'
 
                 git branch: 'main',
                 url: 'https://github.com/Harshitha-Galla5/Jenkins-Zero-To-Hero.git'
@@ -19,6 +26,7 @@ pipeline {
 
         stage('Build and Test') {
             steps {
+
                 sh '''
                 cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
 
@@ -28,10 +36,6 @@ pipeline {
         }
 
         stage('Static Code Analysis') {
-
-            environment {
-                SONAR_URL = "http://13.127.187.57:9000"
-            }
 
             steps {
 
@@ -51,11 +55,19 @@ pipeline {
             }
         }
 
-        stage('Build and Push Docker Image') {
+        stage('Build Docker Image') {
 
-            environment {
-                DOCKER_IMAGE = "harshitha30galla/ultimate-cicd:${BUILD_NUMBER}"
+            steps {
+
+                sh '''
+                cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
+
+                docker build -t ${DOCKER_IMAGE} .
+                '''
             }
+        }
+
+        stage('Push Docker Image') {
 
             steps {
 
@@ -66,24 +78,15 @@ pipeline {
                 )]) {
 
                     sh '''
-                    cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                    /usr/bin/docker build -t ${DOCKER_IMAGE} .
-
-                    echo "$DOCKER_PASS" | /usr/bin/docker login -u "$DOCKER_USER" --password-stdin
-
-                    /usr/bin/docker push ${DOCKER_IMAGE}
+                    docker push ${DOCKER_IMAGE}
                     '''
                 }
             }
         }
 
         stage('Update Deployment File') {
-
-            environment {
-                GIT_REPO_NAME = "Jenkins-Zero-To-Hero"
-                GIT_USER_NAME = "Harshitha-Galla5"
-            }
 
             steps {
 
